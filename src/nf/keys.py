@@ -11,5 +11,6 @@ def secret_field(name: str) -> str:
     return val
 
 
-def openai_key() -> str:
-    return secret_field("OPENAI_API_KEY")
+def openai_key(name: str | None = None) -> str:
+    """OpenAI key from the environment; `name` (the runner's --key-env) overrides the default variable."""
+    return secret_field(name or "OPENAI_API_KEY")
