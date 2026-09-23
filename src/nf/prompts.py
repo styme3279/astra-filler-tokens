@@ -12,15 +12,27 @@
            allowed inside dose runs). Model-emitted repeats are arm C.
   PB/PC  : statement-prefix/repetition filler with k = target token count: full verbatim copies of the statement
            plus the first L lines of the next copy, L chosen so the o200k token count is closest to k.
+  LB/KB  : semantic-but-unrelated filler, user-supplied only: a contiguous excerpt of ~k o200k tokens from an
+           unrelated corpus (LB: prose, Pride and Prejudice; KB: Python source code), starting at a line boundary
+           chosen deterministically from the problem id. See data/filler_corpora/.
 Total tokens in context at answer time are matched between B_k and C_k; the only difference is
 who produced the k copies. Instruction skeletons are kept as close as possible."""
 
+import hashlib
 import re
 from dataclasses import dataclass
+from functools import cache
+from pathlib import Path
 
 import tiktoken
 
 from .tasks import Problem
+
+CORPORA_DIR = Path(__file__).resolve().parents[2] / "data" / "filler_corpora"
+SEMANTIC_ARMS = {  # arm -> (corpus file, how the instruction describes it)
+    "LB": ("prose.txt", "an excerpt from a nineteenth-century English novel"),
+    "KB": ("code.txt", "an excerpt from the source code of a Python program"),
+}
 
 ENC = tiktoken.get_encoding("o200k_base")
 DOT_LINE = ". . . . . . . . . ."  # 10 tokens + newline
@@ -89,6 +101,41 @@ def describe_prefix(copies: int, part: int) -> str:
     return c + " (consecutive copies separated by one blank line)" if copies else p
 
 
+@cache
+def _corpus_lines(name: str) -> tuple[str, ...]:
+    return tuple((CORPORA_DIR / name).read_text(encoding="utf-8").split("\n"))
+
+
+@cache
+def _corpus_tokens(name: str) -> int:
+    return n_tok("\n".join(_corpus_lines(name)))
+
+
+@cache
+def _corpus_starts(name: str) -> tuple[int, ...]:
+    """Indices of lines that begin a paragraph / top-level block (previous line blank), so excerpts start cleanly."""
+    lines = _corpus_lines(name)
+    return tuple(i for i, ln in enumerate(lines) if ln.strip() and (i == 0 or not lines[i - 1].strip()))
+
+
+def semantic_filler(arm: str, problem_id: str, target_tokens: int) -> str:
+    """~target_tokens o200k tokens of unrelated text from the arm's corpus. The excerpt starts at a line boundary
+    picked by hashing the problem id (stable across runs, different across problems), begins a paragraph, and is cut at
+    target_tokens tokens; decoding a token slice can shift the count by one at the cut, so callers record n_tok()."""
+    fname, _ = SEMANTIC_ARMS[arm]
+    lines = _corpus_lines(fname)
+    assert target_tokens <= _corpus_tokens(fname), f"{arm}: corpus {fname} is shorter than {target_tokens} tokens"
+    starts = _corpus_starts(fname)
+    h = int.from_bytes(hashlib.sha256(f"{arm}|{problem_id}".encode()).digest()[:8], "big")
+    start = starts[h % len(starts)]
+    # Every line contributes at least one token, so this window always covers target_tokens (wrapping at the end).
+    window = list(lines[start : start + target_tokens + 50])
+    if len(window) < target_tokens + 50:
+        window += ["", *lines[: target_tokens + 50 - len(window)]]
+    toks = ENC.encode("\n".join(window))
+    return ENC.decode(toks[:target_tokens]).strip()
+
+
 def dots_exact(n_dots: int) -> str:
     full, rem = divmod(n_dots, 10)
     lines = [DOT_LINE] * full + ([" ".join(["."] * rem)] if rem else [])
@@ -132,6 +179,17 @@ def build(problem: Problem, arm: str, k: int) -> Prompt:
             "no working, no explanation, no commentary, no other text before, between, or after the numbers.\n\n" + s
         )
         return Prompt(arm, k, NO_REASONING, user, f, n_tok(f))
+    if arm in SEMANTIC_ARMS:  # semantic but unrelated filler (prose / code excerpt), user-supplied, k = token count
+        assert k > 0
+        f = semantic_filler(arm, problem.problem_id, k)
+        _, what = SEMANTIC_ARMS[arm]
+        user = (
+            f"The problem statement below is followed by about {k} tokens of unrelated text ({what}). "
+            "This text has nothing to do with the problem and carries no information about it; ignore it. "
+            f"Respond with exactly one line of the form `ANSWER: <n>` where <n> is {spec}. "
+            "Output nothing else: no working, no explanation, no repetition of the problem.\n\n" + s + SEP + f
+        )
+        return Prompt(arm, k, NO_REASONING, user, "", n_tok(f))
     if arm == "RB":
         assert k > 0
         body = s + SEP + SEP.join([s] * k)

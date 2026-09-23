@@ -21,6 +21,8 @@ ARMS = {
     "CC": ("counting 1..N, model", "#6ACC65", "--", "s"),
     "RB": ("question repeats, user", "#D65F5F", "-", "o"),
     "C": ("question repeats, model", "#D65F5F", "--", "s"),
+    "LB": ("prose excerpt, user", "#B47CC7", "-", "o"),
+    "KB": ("code excerpt, user", "#C4AD66", "-", "o"),
 }
 
 

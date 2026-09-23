@@ -322,7 +322,7 @@ async def main(a):
         log.write(line + "\n")
         log.flush()
 
-    dose_run = any(x in ("XB", "XC", "XI", "YB", "PB", "PC", "CB", "CC", "RB") for x in a.arms)
+    dose_run = any(x in ("XB", "XC", "XI", "YB", "PB", "PC", "CB", "CC", "RB", "LB", "KB") for x in a.arms)
     jobs = []
     for spec in a.models:
         provider, model, effort = parse_spec(spec)

@@ -33,6 +33,8 @@ METHOD = {
     "DC": "dots≈copies (model)",
     "B": "copies (user)",
     "C": "copies (model)",
+    "LB": "prose excerpt (user)",
+    "KB": "code excerpt (user)",
 }
 
 

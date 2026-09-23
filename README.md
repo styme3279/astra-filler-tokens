@@ -24,7 +24,7 @@ Every analysis below runs from the stored logs without any API key.
   thinking off, DeepSeek with reasoning disabled. See `src/nf/prompts.py` (`NO_REASONING`) and `results/main/example_prompts.md`.
 - **Filler arms** (`src/nf/prompts.py::build`): `XB` exact number of dots after the statement, `CB` counting
   `Filler: 1 2 … N` (≈2 tokens per number), `RB` k repeats of the question, `B` no filler; model-emitted variants `XC`/`CC`;
-  `YB` dots before the statement; `XI` dots framed as "extra space to process the problem"; `R` reasoning allowed.
+  `YB` dots before the statement; `XI` dots framed as "extra space to process the problem"; `LB`/`KB` semantic but unrelated filler (a ~k-token excerpt of *Pride and Prejudice* / of CPython source, see `data/filler_corpora/`); `R` reasoning allowed.
 - **Runner.** `uv run -m nf.run --tag <tag> --models <specs> --tasks <task> --depths … --n … --arms … --ks …`
   writes one JSON row per call (request, full API response, parsed answer, correctness, compliance) to
   `results/<tag>/<model>.jsonl`. `--estimate` prints the call count and token budget without calling any API; the
@@ -59,6 +59,7 @@ response and usage, the parsed answer and a byte-exact compliance check of the p
 The `*_meta.jsonl` files are enough for every analysis of the stored logs; the full question files are needed only to run new evaluations.
 | `gsm8k.jsonl`, `gpqa.jsonl`, `mmlupro.jsonl`, `lehigh26.jsonl` | further benchmarks used in `results/other` | |
 | `us_state_mottos_flowers.json` | tables used by the N-hop grader | rgreenblatt/multi_hop |
+| `filler_corpora/` | prose and code corpora for the semantic-filler arms `LB`/`KB` | Gutenberg #1342 (public domain), CPython 3.12 (PSF) |
 | `openrouter_pins.json`, `openrouter_models_catalog.json`, `human_time_ratings.json`, `metr_horizons.csv` | configs for OpenRouter endpoint pinning and the time-horizon analyses | |
 
 Gen-Arithmetic (`arith`, and the `arithchain`/`arithbal` shape variants) and the synthetic serial tasks are generated
